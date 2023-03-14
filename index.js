@@ -5,60 +5,101 @@ const Color = require('canvas-sketch-util/color');
 const risoColors = require('riso-colors');
 
 const settings = {
-  dimensions: [ 1080, 1080 ],
+  dimensions: [1080, 1080],
 };
 
 const sketch = ({ context, width, height }) => {
-  let x, y, w, h;
+  let x, y, w, h, fill, stroke;
 
-  const degrees = -25;
+  const num = 40;
+  const degrees = -30;
+  const arrows = [];
+  const arrowColors = [
+    random.pick(risoColors),
+    random.pick(risoColors)
+  ];
 
-  return ({ context, width, height }) => {
-    context.fillStyle = 'white';
-    context.fillRect(0, 0, width, height);
+  const bgColor = random.pick(risoColors).hex;
+  const tinyStroke = random.pick(risoColors).hex;
+  const arrowStroke = random.pick(risoColors).hex;
 
-    x = width  * 0.5;
-    y = height * 0.5;
-    w = 300;
-    h = 50;
+  for (let i = 0; i < num; i++) {
+    x = random.range(0, width);
+    y = random.range(0, height);
+    w = random.range(300, 700);
+    h = random.range(50, 300);
+    fill = random.pick(arrowColors).hex;
+    stroke = random.pick(arrowColors).hex;
 
-
-    
-    context.save();
-    context.translate(x, y);
-    context.strokeStyle = 'red';
-    context.lineWidth = 10;
-
-    drawSkewedRect({ context, w, h, degrees });
-    
-    context.stroke();
-    context.restore();
-
-  };
-};  
-
-  const drawSkewedRect = ({ context, w, h, degrees }) => {
-    const angle = math.degToRad(degrees);
-    const rx = Math.cos(angle) * w * 1.05;
-    const ry = Math.sin(angle) * h * 1.05;
-    const rh = Math.sin(math.degToRad(180) - angle) * h * 1.4;
-    const x = 0;
-    const y = 0;
-
-    console.log(rh)
-
-    context.save();
-    context.translate(rx * -0.5, (ry + h) * -0.5);
-    context.beginPath();
-    context.moveTo(0, 0);
-    context.lineTo(rx, ry);
-    context.lineTo(rx - rx * 0.1, ry - rh);
-    context.lineTo(rx * 1.1, ry + h);
-    context.lineTo(rx * 0.1, h);
-    context.lineTo(rx * -0.1, -rh);
-    context.closePath();
-    context.restore();
-  
+    arrows.push({ x, y, w, h, fill, stroke});
   }
 
-  canvasSketch(sketch, settings);
+  return ({ context, width, height }) => {
+    context.fillStyle = bgColor;
+    context.fillRect(0, 0, width, height);
+    
+    arrows.forEach( arrow => {
+      const { x, y, w, h, fill, stroke} = arrow;
+      context.fillStyle = fill;
+
+      context.save();
+      context.translate(x, y);
+
+      context.strokeStyle = stroke;
+      context.lineWidth = 15;
+  
+      drawSkewedArrow({ context, w, h, degrees });
+      
+      context.fill();
+      context.stroke();
+
+      context.lineWidth = 3;
+      context.strokeStyle = tinyStroke;
+      context.stroke();
+
+      //context.translate(x, y);
+      drawTinyArrow({ context, w, h, degrees, arrowStroke});
+
+      context.restore();
+     
+    })
+
+  };
+};
+
+const drawSkewedArrow = ({ context, w, h, degrees}) => {
+  const angle = math.degToRad(degrees);
+
+  context.save();
+  context.rotate(angle);
+  context.beginPath();
+  context.moveTo(0, 0);
+  context.lineTo(w, 0);
+  context.lineTo(w * 0.8, h * 0.5);
+  context.lineTo(w, h);
+  context.lineTo(0, h);
+  context.lineTo(w * -0.2, h * 0.5);
+  context.closePath();
+  context.restore();
+  
+}
+
+const drawTinyArrow = ({ context, w, h, degrees, arrowStroke }) => {
+  const angle = math.degToRad(degrees);
+  context.save();
+  context.lineWidth = 6;
+  context.strokeStyle = arrowStroke;
+  context.shadowColor = 'black';
+  context.shadowBlur = 5;
+  context.rotate(angle);
+  context.beginPath();
+  context.moveTo(w * 0.6 , h * 0.7);
+  context.lineTo(w * 0.7, h * 0.5);
+  context.lineTo(w * 0.6, h * 0.3);
+  context.moveTo(0, h * 0.5);
+  context.lineTo(w * 0.7, h * 0.5);
+  context.stroke();
+  context.restore();
+}
+
+canvasSketch(sketch, settings);
