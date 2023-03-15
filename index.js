@@ -4,7 +4,6 @@ const random = require('canvas-sketch-util/random');
 const Color = require('canvas-sketch-util/color');
 const risoColors = require('riso-colors');
 
-
 const settings = {
   dimensions: [1080, 1080],
 };
@@ -72,23 +71,25 @@ const sketch = ({ context, width, height }) => {
       shadowColor.rgba[3] = 0.5;
       context.shadowColor = Color.style(shadowColor.rgba);
 
-			context.shadowOffsetX = -10;
-			context.shadowOffsetY = 20;
+      context.shadowOffsetX = -10;
+      context.shadowOffsetY = 20;
 
       drawSkewedArrow({ context, w, h, degrees });
-  
-			context.fill();
 
-			context.shadowColor = null;
-			context.stroke();
+      context.fill();
+
+      context.shadowColor = null;
+      context.stroke();
 
       context.lineWidth = 3;
       context.strokeStyle = tinyStroke;
       context.stroke();
-      
+
       context.lineWidth = h * 0.04;
       context.lineCap = 'round';
-      context.strokeStyle = Color.style(Color.offsetHSL(arrowStroke, 20, 15, 10));;
+      context.strokeStyle = Color.style(
+        Color.offsetHSL(arrowStroke, 20, 15, 10)
+      );
       drawTinyArrow({ context, w, h, degrees });
       context.stroke();
 
@@ -111,7 +112,7 @@ const sketch = ({ context, width, height }) => {
       radius: mask.radius - context.lineWidth * 0.5,
       sides: mask.sides,
     });
-    
+
     //drawSkewedArrow({ context, w: mask.x * 1.5, h: mask.y * 1.2, degrees: 135 });
     context.strokeStyle = Color.style(Color.offsetHSL(bgColor, 15, 10, 5));
     shadowColor = Color.style(Color.offsetHSL(bgColor, 10, 15, -20));
