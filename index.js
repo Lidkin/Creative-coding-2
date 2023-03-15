@@ -3,11 +3,10 @@ const math = require('canvas-sketch-util/math');
 const random = require('canvas-sketch-util/random');
 const Color = require('canvas-sketch-util/color');
 const risoColors = require('riso-colors');
-const seed = '2023.03.14-16.16.06';
+
 
 const settings = {
   dimensions: [1080, 1080],
-  name: seed,
 };
 
 const sketch = ({ context, width, height }) => {
