@@ -1,129 +1,147 @@
 const canvasSketch = require('canvas-sketch');
+const random = require('canvas-sketch-util/random');
+const math = require('canvas-sketch-util/math');
+const colormap = require('colormap');
 
 const settings = {
   dimensions: [1080, 1080],
-  animate: true
+  animate: true,
 };
 
-let elCanvas;
-let points;
+const sketch = ({ width, height }) => {
+    const cols = 81;
+    const rows = 27;
+    const numCells = cols * rows;
 
-const sketch = ({ canvas }) => {
-  points = [
-    new Point({ x: 200, y: 540 }),
-    new Point({ x: 400, y: 700 }),
-    new Point({ x: 880, y: 540 }),
-    new Point({ x: 600, y: 700 }),
-    new Point({ x: 640, y: 900 }),
-  ];
+    const gw = width * 0.9;
+    const gh = height * 0.9;
 
-  canvas.addEventListener('mousedown', onMouseDown);
+    const cw = gw / cols;
+    const ch = gh / rows;
 
-  elCanvas = canvas;
+    const mx = (width - gw) * 0.5;
+    const my = (height - gh) * 0.5;
 
-  return ({ context, width, height }) => {
-    context.fillStyle = 'white';
+    const points = [];
+    let x, y, n, lineWidth, color;
+    let frequency = 0.002;
+    let amplitude = 60;
+
+    let colors = colormap({
+      colormap: 'plasma',
+      nshades: amplitude,
+    });  
+
+    
+    const mask = {
+      radius: width * 0.4,
+      sides: 4,
+      x: width * 0.5,
+      y: height * 0.5,
+    };
+
+    for (let i = 0; i < numCells; i++) {
+        x = (i % cols) * cw;
+        y = Math.floor(i / cols) * ch;
+
+        //n = random.noise2D(x, y, frequency, amplitude);
+        n = random.gaussian(x, y);
+        //x += n;
+        //y += n; 
+        
+        lineWidth = math.mapRange(n, -amplitude, amplitude, 0, 10);
+        color = colors[Math.floor(math.mapRange(n, -amplitude, amplitude, 0, amplitude))];
+
+        points.push( new Point({ x, y, lineWidth, color }) );
+        
+    }
+
+  return ({ context, width, height, frame }) => {
+    context.fillStyle = 'darkblue';
     context.fillRect(0, 0, width, height);
 
-    context.strokeStyle = '#999';
-    
-    context.beginPath();
-    context.moveTo(points[0].x, points[0].y);
+    context.save();
+    context.translate(mask.x, mask.y);
 
-    for (let i = 1; i < points.length; i++) {
-      context.lineTo(points[i].x, points[i].y);
-    }
+    drawPolygon({ context, radius: mask.radius, sides: mask.sides });
 
-    context.stroke();
+    context.clip();
 
-    context.beginPath();
-
-    for (let i = 0; i < points.length - 1; i++) {
-      const curr = points[i + 0];
-      const next = points[i + 1];
-
-      const mx = curr.x + (next.x - curr.x) * 0.5;
-      const my = curr.y + (next.y - curr.y) * 0.5;
-
-			//context.beginPath();
-			//context.arc(mx, my, 5, 0, Math.PI * 2);
-			//context.fillStyle = 'blue';
-			//context.fill();
-
-      if (i == 0) context.moveTo(curr.x, curr.y);
-      else if (i == points.length - 2) context.quadraticCurveTo(curr.x, curr.y, next.x, next.y);
-      else context.quadraticCurveTo(curr.x, curr.y, mx, my);
-    }
-
-    context.lineWidth = 4;
-    context.strokeStyle = 'blue';
-    context.stroke();
+    context.save();
+    context.translate(-mask.x, -mask.y);
+    context.translate(mx, my);
+    context.translate(cw * 0.5, ch * 0.5);
 
     points.forEach(point => {
-      point.draw(context);
-    })
+      n = random.noise3D(point.ix, point.iy, frame * 3, frequency, amplitude);
+      point.x = point.ix + n;
+      point.y = point.iy + n; 
+    });
+
+    let lastx, lasty;
+
+    for  (let r = 0; r < rows; r++) {
+
+      for(let c = 0; c < cols - 1; c++) {
+        const curr = points[r * cols + c + 0];
+        const next = points[r * cols + c + 1];
+
+        //const mx = curr.x + (next.x - curr.x) * 0.5;
+        //const my = curr.y + (next.y - curr.y) * 0.5;
+
+        const mx = curr.x + (next.x - curr.x) * 0.5;
+        const my = curr.y + (next.y - curr.y) * 5.5;
+        
+
+        if (!c){
+          lastx = curr.x;
+          lasty = curr.y;
+        }
+    
+        context.beginPath();
+        context.lineWidth = curr.lineWidth;
+        context.lineCap = 'round';
+        context.strokeStyle = curr.color;
+        context.moveTo(lastx, lasty);
+
+        context.quadraticCurveTo(curr.x, curr.y, mx, my);
+
+        context.stroke();
+
+        lastx = mx;
+        lasty = my;
+
+      }
+    }
+
+    context.restore();
+    context.restore();
 
   };
-};
-
-const onMouseDown = (e) => {
-  window.addEventListener('mousemove', onMouseMove);
-  window.addEventListener('mouseup', onMouseUp);
-
-  const x = (e.offsetX / elCanvas.offsetWidth) * elCanvas.width;
-  const y = (e.offsetY / elCanvas.offsetHeight) * elCanvas.height;
-
-  let hit = false;
-  points.forEach(point => {
-    point.isDragging = point.hitTest(x, y);
-    if (!hit && point.isDragging) hit = true;
-  });
-
-  if (!hit) points.push(new Point({ x, y }));
-};
-
-const onMouseMove = (e) => {
-  const x = (e.offsetX / elCanvas.offsetWidth) * elCanvas.width;
-  const y = (e.offsetY / elCanvas.offsetHeight) * elCanvas.height;
-
-  points.forEach(point => {
-    if (point.isDragging) {
-      point.x = x;
-      point.y = y;
-    }
-  });
-};
-
-const onMouseUp = () => {
-  window.removeEventListener('mousemove', onMouseMove);
-  window.removeEventListener('mouseup', onMouseUp);
 };
 
 canvasSketch(sketch, settings);
 
 class Point {
-  constructor({ x, y, control = false }) {
-    this.x = x;
-    this.y = y;
-    this.control = control;
-  }
+    constructor ({x, y, lineWidth, color}) {
+        this.x = x;
+        this.y = y;
+        this.lineWidth = lineWidth;
+        this.color = color;
 
-  draw(context) {
-    context.save();
-    context.translate(this.x, this.y);
-    context.fillStyle = this.control ? 'red' : 'black';
+        this.ix = x;
+        this.iy = y;
+    }
+}
+
+const drawPolygon = ({ context, radius, sides }) => {
+    const slice = Math.PI * 2 / sides;
 
     context.beginPath();
-    context.arc(0, 0, 10, 0, Math.PI * 2);
-    context.fill();
-
-    context.restore();
-  }
-
-  hitTest(x, y) {
-    const dx = this.x - x;
-    const dy = this.y - y;
-    const dd = Math.sqrt(dx * dx + dy * dy);
-    return dd < 20;
-  }
+    context.moveTo(0, -radius);
+    for (let i = 1; i < sides; i++) {
+        const theta = i * slice - Math.PI * 0.5;
+        context.lineTo(Math.cos(theta) * radius, Math.sin(theta) * radius);
+    }
+    context.closePath();
 }
