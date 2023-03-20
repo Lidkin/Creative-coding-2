@@ -1,147 +1,140 @@
 const canvasSketch = require('canvas-sketch');
-const random = require('canvas-sketch-util/random');
 const math = require('canvas-sketch-util/math');
-const colormap = require('colormap');
+const random = require('canvas-sketch-util/random');
+const eases = require('eases');
 
 const settings = {
   dimensions: [1080, 1080],
   animate: true,
 };
 
-const sketch = ({ width, height }) => {
-    const cols = 81;
-    const rows = 27;
-    const numCells = cols * rows;
+let manager;
+let audio;
+let audioContext, audioData, sourceNode, analyserNode;
+let minDb, maxDb;
 
-    const gw = width * 0.9;
-    const gh = height * 0.9;
+const sketch = () => {
+  const numCircles = 5;
+  const numSlices = 9;
+  const slice = (Math.PI * 2) / numSlices;
+  const radius = 100;
 
-    const cw = gw / cols;
-    const ch = gh / rows;
+  const bins = [];
+  const lineWidths = [];
+  let lineWidth, bin, mapped;
 
-    const mx = (width - gw) * 0.5;
-    const my = (height - gh) * 0.5;
+  for (let i = 0; i < numCircles * numSlices; i++) {
+    bin = random.rangeFloor(4, 64);
+    if (random.value() > 0.5) bin = 0;
+    bins.push(bin);
+  }
 
-    const points = [];
-    let x, y, n, lineWidth, color;
-    let frequency = 0.002;
-    let amplitude = 60;
+  for (let i = 0; i < numCircles; i++) {
+    const t = i / (numCircles - 1);
+    lineWidth = eases.quadIn(t) * 200 + 20;
+    lineWidths.push(lineWidth);
+  }
 
-    let colors = colormap({
-      colormap: 'plasma',
-      nshades: amplitude,
-    });  
-
-    
-    const mask = {
-      radius: width * 0.4,
-      sides: 4,
-      x: width * 0.5,
-      y: height * 0.5,
-    };
-
-    for (let i = 0; i < numCells; i++) {
-        x = (i % cols) * cw;
-        y = Math.floor(i / cols) * ch;
-
-        //n = random.noise2D(x, y, frequency, amplitude);
-        n = random.gaussian(x, y);
-        //x += n;
-        //y += n; 
-        
-        lineWidth = math.mapRange(n, -amplitude, amplitude, 0, 10);
-        color = colors[Math.floor(math.mapRange(n, -amplitude, amplitude, 0, amplitude))];
-
-        points.push( new Point({ x, y, lineWidth, color }) );
-        
-    }
-
-  return ({ context, width, height, frame }) => {
-    context.fillStyle = 'darkblue';
+  return ({ context, width, height }) => {
+    context.fillStyle = '#EEEAE0';
     context.fillRect(0, 0, width, height);
 
-    context.save();
-    context.translate(mask.x, mask.y);
+    if (!audioContext) return;
 
-    drawPolygon({ context, radius: mask.radius, sides: mask.sides });
-
-    context.clip();
+    analyserNode.getFloatFrequencyData(audioData);
 
     context.save();
-    context.translate(-mask.x, -mask.y);
-    context.translate(mx, my);
-    context.translate(cw * 0.5, ch * 0.5);
+    context.translate(width * 0.5, height * 0.5);
 
-    points.forEach(point => {
-      n = random.noise3D(point.ix, point.iy, frame * 3, frequency, amplitude);
-      point.x = point.ix + n;
-      point.y = point.iy + n; 
-    });
+    let cradius = radius;
 
-    let lastx, lasty;
+    for (let i = 0; i < numCircles; i++) {
+      context.save();
+      for (let j = 0; j < numSlices; j++) {
+        context.rotate(slice);
+        context.lineWidth = lineWidths[i];
 
-    for  (let r = 0; r < rows; r++) {
+        bin = bins[i * numSlices + j];
+        if (!bin) continue;
 
-      for(let c = 0; c < cols - 1; c++) {
-        const curr = points[r * cols + c + 0];
-        const next = points[r * cols + c + 1];
+        mapped = math.mapRange(audioData[bin], minDb, maxDb, 0, 1, true);
 
-        //const mx = curr.x + (next.x - curr.x) * 0.5;
-        //const my = curr.y + (next.y - curr.y) * 0.5;
+        lineWidth = lineWidths[i] * mapped;
+        if (lineWidth < 1) continue;
+        context.lineWidth = lineWidth;
 
-        const mx = curr.x + (next.x - curr.x) * 0.5;
-        const my = curr.y + (next.y - curr.y) * 5.5;
-        
-
-        if (!c){
-          lastx = curr.x;
-          lasty = curr.y;
-        }
-    
         context.beginPath();
-        context.lineWidth = curr.lineWidth;
-        context.lineCap = 'round';
-        context.strokeStyle = curr.color;
-        context.moveTo(lastx, lasty);
-
-        context.quadraticCurveTo(curr.x, curr.y, mx, my);
-
+        context.arc(0, 0, cradius + context.lineWidth * 0.5, 0, slice);
         context.stroke();
-
-        lastx = mx;
-        lasty = my;
-
       }
+      cradius += lineWidths[i];
+      context.restore();
     }
-
     context.restore();
-    context.restore();
-
+    /*
+    for (let i = 0; i < bins.length; i++) {
+      const bin = bins[i];
+    //const avg = getAverage(audioData);
+      const mapped = math.mapRange(audioData[bin], analyserNode.minDecibels, analyserNode.maxDecibels, 0, 1, true);
+      const radius = mapped * 500;
+    
+    }
+    */
   };
 };
 
-canvasSketch(sketch, settings);
+const addListeners = () => {
+  window.addEventListener('mouseup', () => {
+    if (!audioContext) createAudio();
 
-class Point {
-    constructor ({x, y, lineWidth, color}) {
-        this.x = x;
-        this.y = y;
-        this.lineWidth = lineWidth;
-        this.color = color;
-
-        this.ix = x;
-        this.iy = y;
+    if (audio.paused) {
+      audio.play();
+      manager.play();
+    } else {
+      audio.pause();
+      manager.pause();
     }
-}
+  });
+};
 
-const drawPolygon = ({ context, radius, sides }) => {
-    const slice = Math.PI * 2 / sides;
+const createAudio = () => {
+  audio = document.createElement('audio');
 
-    context.beginPath();
-    context.moveTo(0, -radius);
-    for (let i = 1; i < sides; i++) {
-        const theta = i * slice - Math.PI * 0.5;
-        context.lineTo(Math.cos(theta) * radius, Math.sin(theta) * radius);
-    }
-    context.closePath();
+  audio.crossOrigin = 'anonymous';
+  audio.src ='https://cdn.pixabay.com/download/audio/2022/03/05/audio_f1012306c6.mp3?filename=terra-incognita-22068.mp3';
+  //audio.src = 'https://cdn.artlist.io/artlist-watermarkmp3/396812_396811__ikoliks_-_Big_City_Lights_-_100920_-_EXT_-_X_-_2444.mp3'; 
+
+  audioContext = new AudioContext();
+
+  sourceNode = audioContext.createMediaElementSource(audio);
+  sourceNode.connect(audioContext.destination);
+
+  analyserNode = audioContext.createAnalyser();
+  analyserNode.fftSize = 512;
+  analyserNode.smoothingTimeConstant = 0.9;
+  sourceNode.connect(analyserNode);
+
+  minDb = analyserNode.minDecibels;
+  maxDb = analyserNode.maxDecibels;
+
+  audioData = new Float32Array(analyserNode.frequencyBinCount);
+};
+
+/*
+const getAverage = (data) => {
+  let sum = 0;
+
+  for (let i = 0; i < data.length; i++) {
+    sum += data[i];
+  }
+  return sum / data.length;
 }
+*/
+
+const start = async () => {
+  addListeners();
+  manager = await canvasSketch(sketch, settings);
+  manager.pause();
+};
+
+start();
