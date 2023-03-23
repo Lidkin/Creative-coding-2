@@ -1,14 +1,13 @@
 const canvasSketch = require('canvas-sketch');
 const math = require('canvas-sketch-util/math');
 const random = require('canvas-sketch-util/random');
-const colormap = require('colormap');
 
 const settings = {
   dimensions: [1080, 1080],
   animate: true,
 };
 
-let radius, eyeRadius, n, color;
+let radius = 235, eyeRadius, n;
 let manager;
 let audio;
 let audioContext, audioData, sourceNode, analyserNode;
@@ -28,18 +27,24 @@ const sketch = ({ width, height }) => {
     bins.push(bin);
   }
 
-  let colors = colormap({
-    colormap: 'electric',
-    nshades: diff,
-  });
-
   return ({ context, width, height }) => {
-    context.fillStyle = '#FFEBAD';
+    context.fillStyle = '#F7F5EB';
     context.fillRect(0, 0, width, height);
 
     context.save();
+    context.translate(width * 0.5, height * 0.5);
+    context.fillStyle = 'black';
+    context.beginPath();
+    context.arc(0, 0, radius, 0, Math.PI * 2);
+    context.fill();
+    context.restore();
+
+    context.save();
     context.translate(startPX, startPY);
-    drawEye(context, eyelidW, diff, 0, 0);
+    drawEye(context, eyelidW, diff, 0.82);
+    context.transform(1, 0, 0, 1, eyelidW, 0);
+    context.rotate(Math.PI);
+    drawEye(context, eyelidW, diff, 0.82);
     context.restore();
 
     if (!audioContext) return;
@@ -49,77 +54,48 @@ const sketch = ({ width, height }) => {
     context.save();
     context.translate(startPX, startPY);
 
-    for (let i = 0; i < bins.length - 5; i++) {
+    for (let i = 0; i < bins.length; i++) {
       bin = bins[i];
       n = math.mapRange(audioData[bin], minDb, maxDb, 0, 1, true);
-      radius = math.mapRange(audioData[bin], minDb, maxDb, 150, 10, true);
-      let rad = math.mapRange(audioData[bin], minDb, maxDb, 0, 50, true);
-      color =
-        colors[
-          Math.floor(
-            math.mapRange(audioData[bin], minDb, maxDb, 0, colors.length)
-          )
-        ];
+      radius = math.mapRange(audioData[bin], minDb, maxDb, 100, 250, true);
 
       context.save();
       context.translate(-startPX, -startPY);
       context.translate(width * 0.5, height * 0.5);
-      context.fillStyle = '#EEEAE0';
-      drawCircle(context, 0, 0, eyelidW * 0.5);
-      context.fillStyle = color;
-      drawCircle(context, 0, 0, width * 0.2);
-      context.lineWidth = 10;
-      context.stroke();
-      context.fillStyle = '#2D2424';
-      drawCircle(context, 0, 0, radius);
-      context.fillStyle = 'white';
-      drawCircle(context, 55, -50, rad);
+      context.fillStyle = 'black';
+      context.beginPath();
+      context.arc(0, 0, radius, 0, Math.PI * 2);
+      context.fill();
       context.restore();
     }
-    drawEye(context, eyelidW, diff, n * 1.2, n);
 
+    drawEye(context, eyelidW, diff, n);
+    context.transform(1, 0, 0, 1, eyelidW, 0);
+    context.rotate(Math.PI);
+    drawEye(context, eyelidW, diff, n);
     context.restore();
+
   };
 };
 
-const drawCircle = (context, x, y, radiusC) => {
-  context.beginPath();
-  context.arc(x, y, radiusC, 0, Math.PI * 2);
-  context.fill();
-}
+const drawEye = (context, eyelidW, diff, n) => {
+  context.strokeStyle = 'black';
+  context.fillStyle = 'black';
 
-const drawEye = (context, eyelidW, diff, n1, n2) => {
-
-  context.fillStyle = '#FFF6BF';
-  context.strokeStyle = '#483434';
-  context.lineWidth = 5;
   context.beginPath();
-  context.moveTo(0, 0);
-  drawArc(context, eyelidW, diff, n1);
-  context.rotate(Math.PI);
-  drawArc(context, -eyelidW, -diff, n2);
-  context.fill();
+  context.arc(eyelidW * 0.5, 0, eyelidW * 0.55, 0, Math.PI);
   context.stroke();
-
-}
-
-const drawArc = (context, eyelidW, diff, n) => {
+  context.moveTo(0, 0);
   context.bezierCurveTo(
-    0,
-    eyeRadius * 1.32,
-    eyelidW,
-    eyeRadius * 1.32,
+    diff * 0.9,
+    eyeRadius * n,
+    eyelidW - diff * 1.1,
+    eyeRadius * n,
     eyelidW,
     0
   );
-  context.bezierCurveTo(
-    eyelidW - diff,
-    eyeRadius * n,
-    diff,
-    eyeRadius * n,
-    0,
-    0
-  );
+  context.closePath();
+  context.fill();
 };
 
 const addListeners = () => {
@@ -140,9 +116,8 @@ const createAudio = () => {
   audio = document.createElement('audio');
 
   audio.crossOrigin = 'anonymous';
-  audio.src =
-    'https://cdn.pixabay.com/download/audio/2022/03/05/audio_f1012306c6.mp3?filename=terra-incognita-22068.mp3';
-  // audio.src = 'audio/Sémø - Fractured Timeline.mp3';
+  audio.src = 'https://cdn.pixabay.com/download/audio/2022/03/05/audio_f1012306c6.mp3?filename=terra-incognita-22068.mp3';
+  //audio.src = 'audio/Wild Tulip - Behind That Days - Short Version B.mp3';
 
   audioContext = new AudioContext();
 
@@ -151,7 +126,7 @@ const createAudio = () => {
 
   analyserNode = audioContext.createAnalyser();
   analyserNode.fftSize = 512;
-  analyserNode.smoothingTimeConstant = 0.7;
+  analyserNode.smoothingTimeConstant = 0.85;
   sourceNode.connect(analyserNode);
 
   minDb = analyserNode.minDecibels;
