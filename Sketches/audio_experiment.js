@@ -34,7 +34,7 @@ const sketch = ({ width, height }) => {
   });
 
   return ({ context, width, height }) => {
-    context.fillStyle = '#FFEBAD';
+    context.fillStyle = '#FFDDBD';
     context.fillRect(0, 0, width, height);
 
     context.save();
@@ -90,7 +90,7 @@ const drawCircle = (context, x, y, radiusC) => {
 
 const drawEye = (context, eyelidW, diff, n1, n2) => {
 
-  context.fillStyle = '#FFF6BF';
+  context.fillStyle = '#FFE7D1';
   context.strokeStyle = '#483434';
   context.lineWidth = 5;
   context.beginPath();
