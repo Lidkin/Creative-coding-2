@@ -1,12 +1,13 @@
 const canvasSketch = require('canvas-sketch');
 const math = require('canvas-sketch-util/math');
 const random = require('canvas-sketch-util/random');
+//const eases = require('eases');
 const colormap = require('colormap');
+//const interpolate = require('color-interpolate');
 
 const settings = {
   dimensions: [ 1080, 1080 ],
   animate: true,
-  fps: 2
 };
 
 const triangles = [];
@@ -14,31 +15,18 @@ const circles = [];
 const cursor = { x: 9999, y: 9999 };
 
 const colors = colormap({
-    colormap: 'blackbody',
-    nshades: 30,
+    colormap: 'electric',
+    nshades: 20
 });
 
 const colorsCircle = colormap({
-    colormap: 'copper',
-    nshades: 30,
+    colormap: 'viridis',
+    nshades: 20,
 });
 
 let elCanvas;
 
-let manager;
-let audio;
-let audioContext, audioData, sourceNode, analyserNode;
-let minDb, maxDb;
-
 const sketch = ({ width, height, canvas }) => {
-    const bins = [];
-    let bin;
-
-    for (let i = 0; i < width * height; i++) {
-      bin = random.rangeFloor(4, 64);
-      bins.push(bin);
-    }
-
     let x, y, triangle, numTriangle, circle;
     const cell = Math.floor(width / 40);
     const cols = Math.floor(width / cell);
@@ -49,8 +37,8 @@ const sketch = ({ width, height, canvas }) => {
     const radius = cell * 0.4;
 
     elCanvas = canvas;
-    canvas.addEventListener('mousedown', onMouseDown)
-    
+    canvas.addEventListener('mousedown', onMouseDown);
+
     for (let i = 0; i < numCells; i++) {
             let col = i % cols;
             let row = Math.floor(i / cols);
@@ -71,29 +59,18 @@ const sketch = ({ width, height, canvas }) => {
     return ({ context, width, height }) => {
         context.fillStyle = 'black';
         context.fillRect(0, 0, width, height);
-
-        if (!audioContext) return;
-
-        analyserNode.getFloatFrequencyData(audioData);
         
         circles.forEach( circle => {
-            const ind = circles.indexOf(circle);
-            bin = bins[ind];
-            circle.updateColor(audioData[bin]);
-            circle.drawCircle(context, audioData[bin]);
+            circle.updateColor();
+            circle.drawCircle(context);
         });
 
         triangles.sort((a, b) => a.scale - b.scale);
-        
+
         triangles.forEach( triangle => {
-            const ind = triangles.indexOf(triangle);
-            bin = bins[ind];
-            triangle.update(audioData[bin]);
+            triangle.update();
             triangle.draw(context);
         });
-    
-
-        
 
     };
 };
@@ -121,6 +98,8 @@ const onMouseUp = () => {
     cursor.y = 9999;
 }
 
+canvasSketch( sketch, settings );
+
 class Triangle {
     constructor ({ x, y, sideSize = 15, gapTriangle, numTriangle}) {
 
@@ -139,14 +118,13 @@ class Triangle {
         this.sideSize = sideSize;
         this.gapTriangle = gapTriangle;
         this.numTriangle = numTriangle;
-        this.time = 0;
 
-        this.minDist = random.range(50, 150);
-        this.pushFactor = random.range(0.02, 0.06);
-        this.pullFactor = random.range(0.002, 0.006);
+        this.minDist = 200 //random.range(100, 200);
+        this.pushFactor = 0.02; // random.range(0.02, 0.06);
+        this.pullFactor = 0.002; // random.range(0.002, 0.006);
         this.dampFactor = 0.95;
         this.scale = 1;
-        this.color = 'black'//colors[0];
+        this.color = colors[0];
     }
 
     update() {
@@ -155,21 +133,20 @@ class Triangle {
 
         dx = this.ix - this.x;
         dy = this.iy - this.y;
-        dd = Math.sqrt(dx * dx + dy * dy);
+        dd = Math.hypot(dx, dy);
 
         this.pullFactor = math.clamp(dd, 0.004, 0.006);
 
         this.ax = dx * this.pullFactor;
         this.ay = dy * this.pullFactor;
 
-        this.scale = math.mapRange(dd, 0, 200, 1, 2);
+        this.scale = math.mapRange(dd, 0, 200, 1, 3);
 
         idxColor = Math.floor(math.mapRange(dd, 0, 200, 0, colors.length - 1, true));
         this.color = colors[idxColor];
 
         dx = this.x - cursor.x;
         dy = this.y - cursor.y;
-    
         dd = Math.sqrt(dx * dx + dy * dy);
 
         distDelta = this.minDist - dd;
@@ -234,7 +211,6 @@ class Triangle {
         context.fill();
         context.restore();
     }
-
 }
 
 class Circle {
@@ -250,7 +226,7 @@ class Circle {
         this.maxDist = radius * 60;
     }
 
-    updateColor(audio) {
+    updateColor() {
         let dx, dy, dd;
         let idxColor;
 
@@ -259,65 +235,25 @@ class Circle {
         dd = Math.sqrt(dx * dx + dy * dy);
 
         idxColor = Math.floor(math.mapRange(dd, 0, this.minDist, 0, colorsCircle.length));
-        let mapped = math.mapRange(audio, minDb, maxDb, 0, 1, true);
-        
+
         if (dd < this.minDist) {
             this.color = colorsCircle[idxColor];
         } else if (dd > this.maxDist) {
-            if (mapped > 0.5) this.color = 'white';
-            if (mapped < 0.5) this.color = 'black';
-        }        
+            this.color = 'black';
+        }
     }
     
-    drawCircle(context, audio) {
+    drawCircle(context) {
         context.save();
         context.translate(this.x + this.cell * 0.5, this.y + this.cell * 0.5);
         context.fillStyle = this.color;
 
-        let mapped = this.color === 'white' ? 0.9 : math.mapRange(audio, minDb, maxDb, 2, 0, true).toFixed(1);
-
         context.beginPath();
-        context.arc(0, 0, this.radius * mapped, 0, Math.PI * 2);
+        context.arc(0, 0, this.radius, 0, Math.PI * 2);
         context.fill();
         context.restore();
+    
     }
 
 }
 
-const createAudio = () => {
-    audio = document.createElement('audio');
-    //audio.src = 'audio/Max H. - Preparing the Cannons.mp3';
-    audio.crossOrigin = 'anonymous';
-    audio.src ='https://cdn.pixabay.com/download/audio/2022/03/05/audio_f1012306c6.mp3?filename=terra-incognita-22068.mp3';
-  
-    audioContext = new AudioContext();
-    
-    sourceNode = audioContext.createMediaElementSource(audio);
-    sourceNode.connect(audioContext.destination);
-  
-    analyserNode = audioContext.createAnalyser();
-    analyserNode.fftSize = 512;
-    analyserNode.smoothingTimeConstant = 0.9;
-    sourceNode.connect(analyserNode);
-  
-    minDb = analyserNode.minDecibels;
-    maxDb = analyserNode.maxDecibels;
-  
-    audioData = new Float32Array(analyserNode.frequencyBinCount);
-  
-  }
-  
-const addListeners = () => {
-	window.addEventListener('mouseup', () => {
-		if (!audioContext) createAudio();
-			audio.play();
-			manager.play();
-	});
-};
-
-const start = async () => {
-	addListeners();
-	manager = await canvasSketch(sketch, settings);
-};
-
-start();
